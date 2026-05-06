@@ -108,7 +108,7 @@
         }
 
         // Cargar código y Autoguardado
-        const CODIGO_INICIAL = `limpiar_pantalla()\nagregar_titulo("App Móvil")\nagregar_boton("Púlsame", lambda e: alerta("¡Hola!"))`;
+        const CODIGO_INICIAL = `limpiar_pantalla()\nagregar_titulo("App Móvil")\nagregar_boton("Púlsame", lambda e: alerta("¡Hola Querido Hijo!"))`;
         editor.setValue(localStorage.getItem("py_code") || CODIGO_INICIAL);
         editor.on("change", () => {
             localStorage.setItem("py_code", editor.getValue());
