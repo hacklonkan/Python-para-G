@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link rel="manifest" href="manifest.json">
+    <title>Python Studio Pro 🚀</title>
+   
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/theme/dracula.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.13/mode/python/python.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/pyodide/v0.25.0/full/pyodide.js"></script>
+   
+    <style>
+        :root { --bg: #1e1e2f; --text: white; --accent: #50fa7b; --toolbar: #2d2d44; }
+        body.claro { --bg: #f0f2f5; --text: #1e1e2f; --accent: #28a745; --toolbar: #e0e0e0; }
+
+        body { font-family: 'Segoe UI', sans-serif; margin: 0; padding: 10px; background-color: var(--bg); color: var(--text); transition: 0.3s; }
+       
+        header { display: flex; justify-content: space-between; align-items: center; padding-bottom: 10px; }
+       
+        .main-layout { display: flex; flex-direction: column; gap: 15px; }
+        @media (min-width: 900px) { .main-layout { flex-direction: row; } }
+
+        /* BARRA DE SÍMBOLOS */
+        .symbol-bar {
+            display: flex; gap: 5px; overflow-x: auto; padding: 8px 0;
+            background: var(--toolbar); border-radius: 8px 8px 0 0;
+            justify-content: center; border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .sym-btn {
+            background: #44475a; color: white; border: none; padding: 8px 12px;
+            border-radius: 4px; font-family: monospace; font-weight: bold; cursor: pointer;
+        }
+        .sym-btn:active { background: var(--accent); color: black; }
+
+        .editor-container { flex: 1; border-radius: 10px; overflow: hidden; box-shadow: 0 5px 20px rgba(0,0,0,0.3); }
+        .CodeMirror { height: 350px; font-size: 15px; }
+       
+        #app-preview {
+            flex: 1; background: #ffffff; border-radius: 10px; padding: 20px;
+            min-height: 350px; color: #333; display: flex; flex-direction: column; gap: 10px;
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.1);
+        }
+
+        .controles { display: flex; gap: 8px; margin-top: 10px; }
+        button { padding: 12px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; flex: 1; }
+        #btn-ejecutar { background: var(--accent); color: #282a36; }
+       
+        #consola {
+            width: 100%; height: 70px; background: #282a36; color: #f1fa8c;
+            border-radius: 8px; margin-top: 10px; padding: 8px; font-family: monospace; box-sizing: border-box; font-size: 12px;
+        }
+    </style>
+</head>
+<body id="main-body">
+
+    <header>
+        <div>
+            <h1 style="margin:0; font-size: 1.2rem;">Python Studio 🐍</h1>
+            <small id="save-status" style="opacity: 0.7;">💾 Guardado</small>
+        </div>
+        <select id="tema-selector" onchange="cambiarTema()" style="padding: 5px; border-radius: 5px;">
+            <option value="oscuro">🌙 Oscuro</option>
+            <option value="claro">☀️ Claro</option>
+        </select>
+    </header>
+   
+    <div class="main-layout">
+        <div class="editor-container">
+            <div class="symbol-bar">
+                <button class="sym-btn" onclick="insertar('    ')">TAB</button>
+                <button class="sym-btn" onclick="insertar(':')">:</button>
+                <button class="sym-btn" onclick="insertar('(')">(</button>
+                <button class="sym-btn" onclick="insertar(')')">)</button>
+                <button class="sym-btn" onclick="insertar('&quot;')">"</button>
+                <button class="sym-btn" onclick="insertar('=')">=</button>
+                <button class="sym-btn" onclick="insertar('[')">[</button>
+                <button class="sym-btn" onclick="insertar(']')">]</button>
+                <button class="sym-btn" onclick="insertar('#')">#</button>
+            </div>
+            <textarea id="codigo-base"></textarea>
+        </div>
+        <div id="app-preview"></div>
+    </div>
+
+    <div class="controles">
+        <button id="btn-ejecutar" disabled>Cargando Python...</button>
+        <button id="btn-descargar" onclick="descargar()" style="background:#bd93f9; color:white; flex:0.3;">💾</button>
+    </div>
+
+    <textarea id="consola" readonly></textarea>
+
+    <script>
+        let pyodide;
+        const editor = CodeMirror.fromTextArea(document.getElementById("codigo-base"), {
+            mode: "python", theme: "dracula", lineNumbers: true, indentUnit: 4,
+            extraKeys: {"Tab": (cm) => cm.replaceSelection("    ")}
+        });
+
+        // Función para insertar símbolos desde la barra
+        function insertar(sym) {
+            const doc = editor.getDoc();
+            const cursor = doc.getCursor();
+            doc.replaceRange(sym, cursor);
+            editor.focus();
+        }
+
+        // Cargar código y Autoguardado
+        const CODIGO_INICIAL = `limpiar_pantalla()\nagregar_titulo("App Móvil")\nagregar_boton("Púlsame", lambda e: alerta("¡Hola!"))`;
+        editor.setValue(localStorage.getItem("py_code") || CODIGO_INICIAL);
+        editor.on("change", () => {
+            localStorage.setItem("py_code", editor.getValue());
+            document.getElementById("save-status").innerText = "💾 " + new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+        });
+
+        const framework = `
+import js
+def limpiar_pantalla(): js.document.getElementById("app-preview").innerHTML = ""
+def agregar_titulo(t):
+    el = js.document.createElement("h2"); el.innerHTML = t
+    js.document.getElementById("app-preview").appendChild(el)
+def agregar_boton(t, f):
+    el = js.document.createElement("button"); el.innerHTML = t
+    el.setAttribute("style", "padding:12px; background:#6272a4; color:white; border:none; border-radius:5px; width:100%; font-size:16px;")
+    el.onclick = f; js.document.getElementById("app-preview").appendChild(el)
+def alerta(m): js.alert(m)
+`;
+
+        async function iniciar() {
+            pyodide = await loadPyodide({ stdout: (t) => { document.getElementById("consola").value += t + "\n"; } });
+            document.getElementById("btn-ejecutar").disabled = false;
+            document.getElementById("btn-ejecutar").innerText = "▶ EJECUTAR";
+        }
+
+        document.getElementById("btn-ejecutar").addEventListener("click", async () => {
+            document.getElementById("consola").value = "";
+            try { await pyodide.runPythonAsync(framework + "\n" + editor.getValue()); }
+            catch (e) { document.getElementById("consola").value += "❌ " + e; }
+        });
+
+        function cambiarTema() {
+            const t = document.getElementById("tema-selector").value;
+            document.getElementById("main-body").className = (t === "claro" ? "claro" : "");
+            editor.setOption("theme", (t === "claro" ? "default" : "dracula"));
+        }
+
+        function descargar() {
+            const a = document.createElement("a");
+            a.href = URL.createObjectURL(new Blob([editor.getValue()], {type:"text/plain"}));
+            a.download = "mi_app.py"; a.click();
+        }
+
+        iniciar();
+    </script>
+</body>
+</html>
